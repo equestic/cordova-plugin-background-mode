@@ -51,8 +51,6 @@ NSString* const kAPPBackgroundEventDeactivate = @"deactivate";
 - (void) pluginInitialize
 {
     enabled = NO;
-    [self configureAudioPlayer];
-    [self configureAudioSession];
     [self observeLifeCycle];
 }
 
@@ -72,11 +70,6 @@ NSString* const kAPPBackgroundEventDeactivate = @"deactivate";
         [listener addObserver:self
                      selector:@selector(stopKeepingAwake)
                          name:UIApplicationWillEnterForegroundNotification
-                       object:nil];
-
-        [listener addObserver:self
-                     selector:@selector(handleAudioSessionInterruption:)
-                         name:AVAudioSessionInterruptionNotification
                        object:nil];
 }
 
@@ -121,7 +114,6 @@ NSString* const kAPPBackgroundEventDeactivate = @"deactivate";
     if (!enabled)
         return;
 
-    [audioPlayer play];
     [self fireEvent:kAPPBackgroundEventActivate];
 }
 
@@ -133,51 +125,7 @@ NSString* const kAPPBackgroundEventDeactivate = @"deactivate";
     if (TARGET_IPHONE_SIMULATOR) {
         NSLog(@"BackgroundMode: On simulator apps never pause in background!");
     }
-
-    if (audioPlayer.isPlaying) {
-        [self fireEvent:kAPPBackgroundEventDeactivate];
-    }
-
-    [audioPlayer pause];
 }
-
-/**
- * Configure the audio player.
- */
-- (void) configureAudioPlayer
-{
-    NSString* path = [[NSBundle mainBundle]
-                      pathForResource:@"appbeep" ofType:@"wav"];
-
-    NSURL* url = [NSURL fileURLWithPath:path];
-
-
-    audioPlayer = [[AVAudioPlayer alloc]
-                   initWithContentsOfURL:url error:NULL];
-
-    audioPlayer.volume        = 0;
-    audioPlayer.numberOfLoops = -1;
-};
-
-/**
- * Configure the audio session.
- */
-- (void) configureAudioSession
-{
-    AVAudioSession* session = [AVAudioSession
-                               sharedInstance];
-
-    // Don't activate the audio session yet
-    [session setActive:NO error:NULL];
-
-    // Play music even in background and dont stop playing music
-    // even another app starts playing sound
-    [session setCategory:AVAudioSessionCategoryPlayback
-                   error:NULL];
-
-    // Active the audio session
-    [session setActive:YES error:NULL];
-};
 
 #pragma mark -
 #pragma mark Helper
@@ -192,15 +140,6 @@ NSString* const kAPPBackgroundEventDeactivate = @"deactivate";
 
     [self.commandDelegate sendPluginResult:result
                                 callbackId:command.callbackId];
-}
-
-/**
- * Restart playing sound when interrupted by phone calls.
- */
-- (void) handleAudioSessionInterruption:(NSNotification*)notification
-{
-    [self fireEvent:kAPPBackgroundEventDeactivate];
-    [self keepAwake];
 }
 
 /**
@@ -264,9 +203,6 @@ NSString* const kAPPBackgroundEventDeactivate = @"deactivate";
 
         [obj setValue:[NSNumber numberWithBool:YES]
                forKey:[APPBackgroundMode wkProperty]];
-
-        [obj setValue:[NSNumber numberWithBool:NO]
-               forKey:@"requiresUserActionForMediaPlayback"];
 
         return obj;
     }
